@@ -80,28 +80,30 @@ class ValueIteration(MDPSolver):
             E.g. V[3] returns the computed value for state 3
         """
         V = np.zeros(self.state_dim)
+
+        # V = np.random.rand(self.state_dim)
+        # V[self.mdp._state_dict['rock0']] = 0.0
+
         ### PUT YOUR CODE HERE ###
-        delta = 0
+        delta = None
         launching = True
         itr_count = 0
-        while (delta >= theta) or launching:
-            launching = False
+        while delta is None or delta >= theta : #avoid type check for 1st iteration
+            delta = 0
             for s, s_idx in self.mdp._state_dict.items():
-                v_best = 0
+                v_best = None
                 for a, a_idx in self.mdp._action_dict.items():
-                    v_a = 0
+                    v_a = 0 # accumulative variable for current action
                     for sp, sp_idx in self.mdp._state_dict.items():
                         v_a += self.mdp.P[s_idx,a_idx,sp_idx] * (self.mdp.R[s_idx,a_idx,sp_idx] + self.gamma*V[sp_idx])
-                    v_best = max(v_best, v_a) # what about tie breaking
-                    print(v_best)
+                    v_best = v_a if v_best is None else max(v_best, v_a) # what about tie breaking
                 delta = max(delta, abs(V[s_idx]-v_best))
                 V[s_idx] = v_best
             itr_count += 1
-            if itr_count%100000 == 0:
-                print("Value Iteration # ", itr_count)
-                print("delta = ", delta)
-                print("V = ", V)
-        # raise NotImplementedError("Needed for Q1")
+            # if itr_count%1 == 0:
+            #     print("Value Iteration # ", itr_count)
+            #     print("delta = ", delta)
+            #     print("V = ", V)
         return V
 
     def _calc_policy(self, V: np.ndarray) -> np.ndarray:
@@ -122,19 +124,20 @@ class ValueIteration(MDPSolver):
             policy[S, OTHER_ACTIONS] = 0
         """
         policy = np.zeros([self.state_dim, self.action_dim])
+
         ### PUT YOUR CODE HERE ###
         for s, s_idx in self.mdp._state_dict.items():
             a_best = None
-            v_best = 0
+            v_best = None
             for a, a_idx in self.mdp._action_dict.items():
                 v_a = 0
                 for sp, sp_idx in self.mdp._state_dict.items():
                     v_a += self.mdp.P[s_idx,a_idx,sp_idx] * (self.mdp.R[s_idx,a_idx,sp_idx] + self.gamma*V[sp_idx])
-                v_best = max(v_best, v_a) # what about tie breaking
+                v_best = v_a if v_best is None else max(v_best, v_a) # what about tie breaking
                 if v_best == v_a: a_best = a_idx
             policy[s_idx, a_best] = 1.0
-
-        # raise NotImplementedError("Needed for Q1")
+        # Python Dict has no order, causing undetermined
+        # behaviour for the terminate state that doesn't really matter
         return policy
 
     def solve(self, theta: float = 1e-6) -> Tuple[np.ndarray, np.ndarray]:
@@ -181,8 +184,9 @@ class PolicyIteration(MDPSolver):
         """
         V = np.zeros(self.state_dim)
         ### PUT YOUR CODE HERE ###
-        delta = 0
-        while delta >= self.theta:
+        delta = None
+        while delta is None or delta >= self.theta: #trick the intepreter to not look
+            delta = 0
             for s, s_idx in self.mdp._state_dict.items():
                 v_new = 0
                 for sp, sp_idx in self.mdp._state_dict.items():
