@@ -189,13 +189,17 @@ class PolicyIteration(MDPSolver):
             delta = 0
             for s, s_idx in self.mdp._state_dict.items():
                 v_new = 0
-                for sp, sp_idx in self.mdp._state_dict.items():
-                    pi_a_idx = np.argmax(policy[s_idx, :])
-                    v_new += self.mdp.P[s_idx,pi_a_idx, sp_idx] * (self.mdp.R[s_idx, pi_a_idx, sp_idx] + self.gamma*V[sp_idx])
+                for a, a_idx in self.mdp._action_dict.items():
+                    pi_a = policy[s_idx, a_idx] # prob for the action a at state s
+                    for sp, sp_idx in self.mdp._state_dict.items():
+                        v_new += self.mdp.P[s_idx,a_idx, sp_idx] * (self.mdp.R[s_idx, a_idx, sp_idx] + self.gamma*V[sp_idx])
+                    v_new *= pi_a
                 delta = max(delta, abs(V[s_idx] - v_new))
                 V[s_idx] = v_new
 
         # raise NotImplementedError("Needed for Q1")
+        print(policy)
+        print(V)
         return np.array(V)
 
     def _policy_improvement(self) -> Tuple[np.ndarray, np.ndarray]:
@@ -220,12 +224,24 @@ class PolicyIteration(MDPSolver):
         policy = np.zeros([self.state_dim, self.action_dim])
         V = np.zeros([self.state_dim])
         ### PUT YOUR CODE HERE ###
-        policy_stable = False
-        while not policy_stable:
+        policy_stable = None
+        while policy_stable is None or not policy_stable:
+            print("iterating policy")
+            policy_stable = True
             V = self._policy_eval(policy)
             for s, s_idx in self.mdp._state_dict.items():
-                new_a_idx = np.argmax(V[s_idx])
-                policy_stable = True if(new_a_idx == np.argmax(policy[s_idx, :])) else False
+                a_best = None
+                v_best = None
+                for a, a_idx in self.mdp._action_dict.items():
+                    v_a = 0
+                    for sp, sp_idx in self.mdp._state_dict.items():
+                        v_a += self.mdp.P[s_idx,a_idx,sp_idx] * (self.mdp.R[s_idx,a_idx,sp_idx] + self.gamma*V[sp_idx])
+                    v_best = v_a if v_best is None else max(v_best, v_a)  # what about tie breaking
+                    if v_best == v_a: a_best = a_idx
+                old_a = np.argmax(policy[s_idx, :])
+                if old_a != a_best : policy_stable = False
+                policy[s_idx, :] = 0.0
+                policy[s_idx, a_best] = 1.0
 
         # raise NotImplementedError("Needed for Q1")
         return policy, V
