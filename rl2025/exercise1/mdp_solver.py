@@ -183,6 +183,8 @@ class PolicyIteration(MDPSolver):
             It is indexed as (State) where V[State] is the value of state 'State'
         """
         V = np.zeros(self.state_dim)
+        # V = np.random.rand(self.state_dim)
+        # V[self.mdp._state_dict['rock0']] = 0.0
         ### PUT YOUR CODE HERE ###
         delta = None
         while delta is None or delta >= self.theta: #trick the intepreter to not look
@@ -221,7 +223,8 @@ class PolicyIteration(MDPSolver):
                        np.ndarray of float with dim (num of states)):
             Tuple of calculated policy and value function
         """
-        policy = np.zeros([self.state_dim, self.action_dim])
+        # policy = np.zeros([self.state_dim, self.action_dim])
+        policy = np.ones([self.state_dim, self.action_dim]) / self.action_dim
         V = np.zeros([self.state_dim])
         ### PUT YOUR CODE HERE ###
         policy_stable = None
