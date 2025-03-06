@@ -54,9 +54,16 @@ class Agent(ABC):
         :return (int): index of selected action
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q2")
-        ### RETURN AN ACTION HERE ###
-        return -1
+        next_act = None
+        if random.uniform(0, 1) >= self.epsilon:
+            state_actions = [(action, self.q_table[state,action]) for (state, action) in self.q_table if state == obs]
+            next_act = max(state_actions, key=lambda x: x[1])[0] # doesnt check if exist valid action
+            # print(n_state_actions)
+        else:
+            next_act = random.randrange(self.n_acts) #all action are possible to perform at all states
+
+        # ### RETURN AN ACTION HERE ###
+        return next_act
 
     @abstractmethod
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
@@ -105,7 +112,16 @@ class QLearningAgent(Agent):
         :return (float): updated Q-value for current observation-action pair
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q2")
+        old_q = self.q_table[obs,action]
+
+        n_state_actions = [(action, self.q_table[state, action]) for (state, action) in self.q_table if state == n_obs]
+        # print(n_state_actions)
+        n_a_max = max(n_state_actions, key=lambda x: x[1])[0]  # doesnt check if exist valid action
+        q_sp = self.q_table[n_obs, n_a_max]
+
+        new_q = old_q + self.alpha * (reward + self.gamma * q_sp - old_q)
+        self.q_table[obs, action] = new_q
+
         return self.q_table[(obs, action)]
 
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):

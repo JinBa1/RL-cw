@@ -183,25 +183,41 @@ class PolicyIteration(MDPSolver):
             It is indexed as (State) where V[State] is the value of state 'State'
         """
         V = np.zeros(self.state_dim)
-        # V = np.random.rand(self.state_dim)
-        # V[self.mdp._state_dict['rock0']] = 0.0
-        ### PUT YOUR CODE HERE ###
-        delta = None
-        while delta is None or delta >= self.theta: #trick the intepreter to not look
+
+        iteration = 0
+        while True:
             delta = 0
             for s, s_idx in self.mdp._state_dict.items():
+                v_old = V[s_idx]
+
+                # Calculate new state value based on current policy
                 v_new = 0
                 for a, a_idx in self.mdp._action_dict.items():
-                    pi_a = policy[s_idx, a_idx] # prob for the action a at state s
-                    for sp, sp_idx in self.mdp._state_dict.items():
-                        v_new += self.mdp.P[s_idx,a_idx, sp_idx] * (self.mdp.R[s_idx, a_idx, sp_idx] + self.gamma*V[sp_idx])
-                    v_new *= pi_a
-                delta = max(delta, abs(V[s_idx] - v_new))
-                V[s_idx] = v_new
+                    # Only consider actions with non-zero probability
+                    if policy[s_idx, a_idx] > 0:
+                        # Calculate action value
+                        action_value = 0
+                        for sp, sp_idx in self.mdp._state_dict.items():
+                            action_value += self.mdp.P[s_idx, a_idx, sp_idx] * (
+                                    self.mdp.R[s_idx, a_idx, sp_idx] + self.gamma * V[sp_idx]
+                            )
+                        # Weight by policy probability
+                        v_new += policy[s_idx, a_idx] * action_value
 
-        # raise NotImplementedError("Needed for Q1")
-        print(policy)
-        print(V)
+                # Update value and track max change
+                V[s_idx] = v_new
+                delta = max(delta, abs(v_old - v_new))
+
+            iteration += 1
+            # Check for convergence
+            if delta < self.theta:
+                break
+
+            # Safety check
+            if iteration > 1000:
+                print(f"Warning: Policy evaluation not converging after {iteration} iterations")
+                break
+
         return np.array(V)
 
     def _policy_improvement(self) -> Tuple[np.ndarray, np.ndarray]:
@@ -225,28 +241,55 @@ class PolicyIteration(MDPSolver):
         """
         # policy = np.zeros([self.state_dim, self.action_dim])
         policy = np.ones([self.state_dim, self.action_dim]) / self.action_dim
-        V = np.zeros([self.state_dim])
-        ### PUT YOUR CODE HERE ###
-        policy_stable = None
-        while policy_stable is None or not policy_stable:
-            print("iterating policy")
-            policy_stable = True
-            V = self._policy_eval(policy)
-            for s, s_idx in self.mdp._state_dict.items():
-                a_best = None
-                v_best = None
-                for a, a_idx in self.mdp._action_dict.items():
-                    v_a = 0
-                    for sp, sp_idx in self.mdp._state_dict.items():
-                        v_a += self.mdp.P[s_idx,a_idx,sp_idx] * (self.mdp.R[s_idx,a_idx,sp_idx] + self.gamma*V[sp_idx])
-                    v_best = v_a if v_best is None else max(v_best, v_a)  # what about tie breaking
-                    if v_best == v_a: a_best = a_idx
-                old_a = np.argmax(policy[s_idx, :])
-                if old_a != a_best : policy_stable = False
-                policy[s_idx, :] = 0.0
-                policy[s_idx, a_best] = 1.0
 
-        # raise NotImplementedError("Needed for Q1")
+        iteration = 0
+        while True:
+            # Evaluate current policy
+            V = self._policy_eval(policy)
+            # print(f"Policy Iteration {iteration + 1} - Policy eval complete")
+
+            # Policy improvement step
+            policy_stable = True
+
+            # For each state
+            for s, s_idx in self.mdp._state_dict.items():
+                old_action = np.argmax(policy[s_idx])
+
+                # Find action values
+                action_values = np.zeros(self.action_dim)
+                for a, a_idx in self.mdp._action_dict.items():
+                    action_value = 0
+                    for sp, sp_idx in self.mdp._state_dict.items():
+                        action_value += self.mdp.P[s_idx, a_idx, sp_idx] * (
+                                self.mdp.R[s_idx, a_idx, sp_idx] + self.gamma * V[sp_idx]
+                        )
+                    action_values[a_idx] = action_value
+
+                # Find best action
+                best_action = np.argmax(action_values)
+
+                # Check if policy changed
+                if old_action != best_action:
+                    policy_stable = False
+
+                # Update policy to be deterministic for best action
+                policy[s_idx] = 0.0
+                policy[s_idx, best_action] = 1.0
+
+            iteration += 1
+            # print(f"Policy Iteration {iteration} - Policy: {policy}")
+            # print(f"Policy Iteration {iteration} - Value: {V}")
+
+            # If policy is stable, we're done
+            if policy_stable:
+                print(f"Policy stable after {iteration} iterations")
+                break
+
+            # Safety check
+            if iteration > 100:
+                print(f"Warning: Policy not converging after {iteration} iterations")
+                break
+
         return policy, V
 
     def solve(self, theta: float = 1e-6) -> Tuple[np.ndarray, np.ndarray]:
