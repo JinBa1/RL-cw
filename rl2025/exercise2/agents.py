@@ -181,12 +181,19 @@ class MonteCarloAgent(Agent):
         ### PUT YOUR CODE HERE ###
         total_reward = 0
         for state, action, reward in reversed(list(zip(obses, actions, rewards))):
-            total_reward += self.gamma + reward
+            total_reward = self.gamma * total_reward + reward
+
+            # updating state-action count, retreive old count
             old_count = self.sa_counts.get((state,action), 0)
             self.sa_counts[(state, action)] = old_count + 1
-            return_sa = old_count * self.q_table[(state,action)] # recontruct the return(s_t, a_t) value
+
+            old_q = self.q_table[(state,action)]
+            return_sa = old_count * old_q # recontruct the return(s_t, a_t) value
             return_sa += total_reward
             new_q_value = return_sa / self.sa_counts[(state,action)]
+
+            # update the values
+            self.q_table[(state, action)] = new_q_value
             updated_values[(state,action)] = new_q_value
 
         return updated_values
