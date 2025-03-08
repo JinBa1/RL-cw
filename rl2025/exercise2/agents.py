@@ -4,6 +4,7 @@ import random
 from typing import List, Dict, DefaultDict
 from gymnasium.spaces import Space
 from gymnasium.spaces.utils import flatdim
+import numpy as np
 
 
 class Agent(ABC):
@@ -56,11 +57,13 @@ class Agent(ABC):
         ### PUT YOUR CODE HERE ###
         next_act = None
         if random.uniform(0, 1) >= self.epsilon:
-            state_actions = [(action, self.q_table[state,action]) for (state, action) in self.q_table if state == obs]
-            next_act = max(state_actions, key=lambda x: x[1])[0] # doesnt check if exist valid action
-            # print(n_state_actions)
+            q_values = [self.q_table[(obs, action)] for action in range(self.n_acts)]
+            if all(q == 0 for q in q_values):
+                next_act = self.action_space.sample() # random selection when no q values exist
+            else:
+                next_act = np.argmax(q_values)
         else:
-            next_act = random.randrange(self.n_acts) #all action are possible to perform at all states
+            next_act = self.action_space.sample() #all action are possible to perform at all states
 
         # ### RETURN AN ACTION HERE ###
         return next_act
@@ -114,12 +117,16 @@ class QLearningAgent(Agent):
         ### PUT YOUR CODE HERE ###
         old_q = self.q_table[obs,action]
 
-        n_state_actions = [(action, self.q_table[state, action]) for (state, action) in self.q_table if state == n_obs]
-        # print(n_state_actions)
-        n_a_max = max(n_state_actions, key=lambda x: x[1])[0]  # doesnt check if exist valid action
-        q_sp = self.q_table[n_obs, n_a_max]
+        if done:
+            target = reward
+        else:
+            next_q_values = [self.q_table[(n_obs, action)] for action in range(self.n_acts)]
+            max_n_q = max(next_q_values)
 
-        new_q = old_q + self.alpha * (reward + self.gamma * q_sp - old_q)
+            target = reward + self.gamma * max_n_q
+
+
+        new_q = old_q + self.alpha * (target - old_q)
         self.q_table[obs, action] = new_q
 
         return self.q_table[(obs, action)]
@@ -169,8 +176,19 @@ class MonteCarloAgent(Agent):
             indexed by the state action pair.
         """
         updated_values = {}
+
+        returns = defaultdict(lambda: 0)
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q2")
+        total_reward = 0
+        for state, action, reward in reversed(list(zip(obses, actions, rewards))):
+            total_reward += self.gamma + reward
+            old_count = self.sa_counts.get((state,action), 0)
+            self.sa_counts[(state, action)] = old_count + 1
+            return_sa = old_count * self.q_table[(state,action)] # recontruct the return(s_t, a_t) value
+            return_sa += total_reward
+            new_q_value = return_sa / self.sa_counts[(state,action)]
+            updated_values[(state,action)] = new_q_value
+
         return updated_values
 
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
