@@ -17,16 +17,10 @@ def evaluate(env: gym.Env, config, output: bool = True) -> Tuple[List[float], Li
     :param output (bool): flag whether evaluation results should be printed
     :return (Tuple[List[float], List[float]]): eval returns during training, times of evaluation
     """
-    timesteps_elapsed = 0
-
     agent = DiscreteRL(
         action_space=env.action_space, observation_space=env.observation_space, **config
     )
     agent.restore(config['save_filename'])
-
-    eval_returns_all = []
-    eval_times_all = []
-
 
     eval_returns = 0
     for _ in range(config["eval_episodes"]):
@@ -58,14 +52,14 @@ if __name__ == "__main__":
     best_run, best_run_filename = get_best_saved_run(results)
     print(f"Best run was {best_run_filename}")
     CONFIG.update(best_run.config)
-    CONFIG['save_filename'] = SWEEP_DIR + best_run_filename
+    # replace the line below to point to the directory where your sweep results are stored
+    CONFIG['save_filename'] = best_run_filename
     returns = evaluate(env, CONFIG)
     print(returns)
     env.close()
 
 
 
-"""    
-SWEEP_DIR = "/home/..." #Path to sweep results directory
-SWEEP_RESULTS_FILE = SWEEP_DIR + SWEEP_RESULTS_FILE_CARTPOLE
-"""
+# Uncomment and modify if your sweep results are stored in a different directory
+# SWEEP_DIR = "/path/to/sweep/results/" # Path to sweep results directory
+# CONFIG['save_filename'] = SWEEP_DIR + best_run_filename

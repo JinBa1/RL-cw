@@ -111,28 +111,20 @@ def play_episode(
     num_steps = 0
     episode_return = 0
 
-    observations = []
-    actions = []
-    rewards = []
-
     while not done and num_steps < max_steps:
         action = agent.act(np.array(obs), explore=explore)
         nobs, rew, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
 
-        observations.append(obs)
-        actions.append(action)
-        rewards.append(rew)
+        if train:
+            # Update agent after each step with (s, a, r, s', done) tuple
+            q_value = agent.update(obs, action, rew, nobs, done)
+            ep_data['q_values'].append(q_value)
 
         num_steps += 1
         episode_return += rew
 
         obs = nobs
-
-    if train:
-        new_data = agent.update(rewards, observations, actions)
-        for k, v in new_data.items():
-            ep_data[k].append(v)
 
     return num_steps, episode_return, ep_data
 
@@ -183,7 +175,7 @@ def train(env: gym.Env, config, output: bool = True) -> Tuple[np.ndarray, np.nda
 
             if timesteps_elapsed % config["eval_freq"] < num_steps:
                 eval_return = 0
-                if config["env"] == "CartPole-v1":
+                if config["env"] == "CartPole-v1" or config["env"] == "MountainCar-v0":
                     max_steps = config["episode_length"]
                 else:
                     raise ValueError(f"Unknown environment {config['env']}")
@@ -216,7 +208,7 @@ def train(env: gym.Env, config, output: bool = True) -> Tuple[np.ndarray, np.nda
 
 
 if __name__ == "__main__":
-
+    print(ENV)
     if ENV == "MOUNTAINCAR":
         CONFIG = MOUNTAINCAR_CONFIG
         HPARAMS_SWEEP = MOUNTAINCAR_HPARAMS
