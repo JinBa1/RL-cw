@@ -1,3 +1,4 @@
+import random
 from abc import ABC, abstractmethod
 from copy import deepcopy
 import gymnasium as gym
@@ -8,6 +9,8 @@ from torch.distributions.categorical import Categorical
 import torch.nn
 from torch.optim import Adam
 from typing import Dict, Iterable, List
+
+import torch.nn.functional as F # Added imports
 
 from rl2025.exercise3.networks import FCNetwork
 from rl2025.exercise3.replay import Transition
@@ -238,7 +241,14 @@ class DQN(Agent):
         :return (sample from self.action_space): action the agent should perform
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q3")
+        obs_tensor = torch.FloatTensor(obs).unsqueeze(0)
+
+        if not explore or random.uniform(0,1) >= self.epsilon:
+            with torch.no_grad():
+                q_values = self.critics_net(obs_tensor)
+            return torch.argmax(q_values).item()
+        else:
+            return self.action_space.sample()
 
     def update(self, batch: Transition) -> Dict[str, float]:
         """Update function for DQN
@@ -253,8 +263,38 @@ class DQN(Agent):
         :return (Dict[str, float]): dictionary mapping from loss names to loss values
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q3")
-        q_loss = 0.0
+        states = batch.states
+        actions = batch.actions.long() # Need long type for indexing
+        rewards = batch.rewards
+        next_states = batch.next_states
+        done = batch.done
+
+        # Get Q-values for current states and selected actions
+        current_q_values = self.critics_net(states).gather(1, actions).squeeze()
+
+        # Compute the target Q-values
+        with torch.no_grad(): # Don't track gradients for target computation
+            # Get max Q-value for next state from target network
+            next_q_values = self.critics_target(next_states).max(1)[0]
+            # Bellman equation: Q(s,a) = r + gamma * max_a'(Q(s',a')) * (1 - done)
+            target_q_values = rewards + self.gamma * next_q_values * (1 - done)
+
+        # Compute the loss
+        loss = F.mse_loss(current_q_values, target_q_values)
+
+        # Optimize the model
+        self.critics_optim.zero_grad()
+        loss.backward()
+        self.critics_optim.step()
+
+        # Update target network if it's time
+        self.update_counter +=1
+        if self.update_counter % self.target_update_freq == 0:
+            self.critics_target.hard_update(self.critics_net)
+
+
+
+        q_loss = loss.item()
         return {"q_loss": q_loss}
 
 
@@ -289,7 +329,20 @@ class DiscreteRL(Agent):
         :return (float): updated Q-value for current observation-action pair
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q2")
+        old_q = self.q_table[obs,action]
+
+        if done:
+            target = reward
+        else:
+            next_q_values = [self.q_table[(n_obs, action)] for action in range(self.n_acts)]
+            max_n_q = max(next_q_values)
+
+            target = reward + self.gamma * max_n_q
+
+
+        new_q = old_q + self.alpha * (target - old_q)
+        self.q_table[obs, action] = new_q
+
         return self.q_table[(obs, action)]
 
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
@@ -374,6 +427,22 @@ class DiscreteRL(Agent):
         """
         pass
 
+    def _discretize_observation(self, obs):
+        """Convert continuous observation to discrete state index"""
+        # For MountainCar with dimensions: position (-1.2, 0.6) and velocity (-0.07, 0.07)
+        position, velocity = obs
+
+        # Create 8x8 grid as mentioned in instructions
+        pos_bins = np.linspace(-1.2, 0.6, 9)  # 9 values create 8 bins
+        vel_bins = np.linspace(-0.07, 0.07, 9)
+
+        # Find bin indices
+        pos_idx = np.digitize(position, pos_bins)
+        vel_idx = np.digitize(velocity, vel_bins)
+
+        # Convert to a single integer representing the state
+        return (pos_idx, vel_idx)
+
     def act(self, obs: np.ndarray, explore: bool):
         """Returns an action (should be called at every timestep)
 
@@ -396,7 +465,14 @@ class DiscreteRL(Agent):
         pole angular velocity: theta-dot <= -0.872 | -0.872 < theta-dot <= 0.872 | 0.872 < theta-dot 
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q3")
+        # Discretize obs
+        state = self._discretize_observation(obs)
+
+        if not explore or random.uniform(0,1) > self.epsilon:
+            q_values = [self.q_table.get((state,a), 0.0) for a in range(self.action_space.n)]
+            return np.argmax(q_values)
+        else:
+            return self.action_space.sample()
 
     def update(
         self, rewards: List[float], observations: List[np.ndarray], actions: List[int],
@@ -412,6 +488,26 @@ class DiscreteRL(Agent):
             losses
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q3")
-        p_loss = 0.0
+        # Calculate returns for each timestep
+        returns = 0
+        batch_loss = 0
+
+        # Process the episode backward to calculate returns and update Q-values
+        for t in reversed(range(len(rewards))):
+            # Get state and action
+            obs = observations[t]
+            state = self._discretize_observation(obs)
+            action = actions[t]
+
+            # Calculate return
+            returns = rewards[t] + self.gamma * returns
+
+            # Update Q-value toward the return (Monte Carlo update)
+            old_q = self.q_table.get((state, action), 0.0)
+            new_q = old_q + self.alpha * (returns - old_q)
+            self.q_table[(state, action)] = new_q
+
+            # Track loss
+            batch_loss += (returns - old_q) ** 2
+        p_loss =  batch_loss / len(rewards) if rewards else 0.0
         return {"p_loss": p_loss}
