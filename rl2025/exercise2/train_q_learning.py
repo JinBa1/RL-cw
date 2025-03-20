@@ -1,17 +1,30 @@
 import gymnasium as gym
 from tqdm import tqdm
+import numpy as np
+import copy
+import time
 
 from rl2025.constants import EX2_QL_CONSTANTS as CONSTANTS
 from rl2025.exercise2.agents import QLearningAgent
 from rl2025.exercise2.utils import evaluate
 
-CONFIG = {
-    "eval_freq": 1000, # keep this unchanged
+from rl2025.util.result_processing import Run
+
+# Original configuration values from the assignment
+BASE_CONFIG = {
+    "eval_freq": 1000,  # keep this unchanged
     "alpha": 0.05,
     "epsilon": 0.9,
-    "gamma": 0.99,
 }
-CONFIG.update(CONSTANTS)
+
+# Configurations for different gamma values as specified in Table 2
+GAMMA_CONFIGS = {
+    "0.99": {"gamma": 0.99},
+    "0.8": {"gamma": 0.8}
+}
+
+# Number of seeds to run for each configuration
+NUM_SEEDS = 10
 
 
 def q_learning_eval(
@@ -37,7 +50,7 @@ def q_learning_eval(
     )
     eval_agent.q_table = q_table
     if render:
-        eval_env = gym.make(CONFIG["env"], render_mode="human")
+        eval_env = gym.make(config["env"], render_mode="human")
     else:
         eval_env = env
     return evaluate(eval_env, eval_agent, config["eval_eps_max_steps"], config["eval_episodes"])
@@ -49,9 +62,9 @@ def train(env, config):
 
     :param env (gym.Env): environment to execute evaluation on
     :param config (Dict[str, float]): configuration dictionary containing hyperparameters
-    :return (float, List[float], List[float], Dict[(Obs, Act), float]):
-        total reward over all episodes, list of means and standard deviations of evaluation
-        returns, final Q-table
+    :return (float, List[float], List[float], List[int], Dict[(Obs, Act), float]):
+        total reward over all episodes, mean returns from evaluations,
+        negative returns counts, evaluation timesteps, final Q-table
     """
     agent = QLearningAgent(
         action_space=env.action_space,
@@ -67,8 +80,9 @@ def train(env, config):
     total_reward = 0
     evaluation_return_means = []
     evaluation_negative_returns = []
+    evaluation_timesteps = []
 
-    for eps_num in tqdm(range(1, config["total_eps"]+1)):
+    for eps_num in tqdm(range(1, config["total_eps"] + 1), desc=f"Training (gamma={config['gamma']})"):
         obs, _ = env.reset()
         episodic_return = 0
         t = 0
@@ -96,10 +110,66 @@ def train(env, config):
             tqdm.write(f"EVALUATION: EP {eps_num} - MEAN RETURN {mean_return}")
             evaluation_return_means.append(mean_return)
             evaluation_negative_returns.append(negative_returns)
+            evaluation_timesteps.append(eps_num)
 
-    return total_reward, evaluation_return_means, evaluation_negative_returns, agent.q_table
+    return total_reward, evaluation_return_means, evaluation_negative_returns, evaluation_timesteps, agent.q_table
 
 
 if __name__ == "__main__":
-    env = gym.make(CONFIG["env"])
-    total_reward, _, _, q_table = train(env, CONFIG)
+    # Initialize Run objects for each gamma configuration
+    runs = {}
+    for gamma_key, gamma_config in GAMMA_CONFIGS.items():
+        # Start with BASE_CONFIG
+        full_config = copy.deepcopy(BASE_CONFIG)
+        # Add gamma from GAMMA_CONFIGS
+        full_config.update(gamma_config)
+        # Add any constants from CONSTANTS
+        full_config.update(CONSTANTS)
+        full_config['save_filename'] = None  # Add this line to avoid the KeyError
+
+        # Initialize Run object
+        runs[gamma_key] = Run(full_config)
+        runs[gamma_key].run_name = f"Q-Learning (gamma={gamma_key})"
+
+    # Run multiple seeds for each configuration
+    for gamma_key, run in runs.items():
+        config = run.config
+        print(f"\nRunning Q-Learning with gamma={config['gamma']}")
+
+        for seed in range(NUM_SEEDS):
+            print(f"\nSeed {seed + 1}/{NUM_SEEDS}")
+            env = gym.make(config["env"])
+
+            # Track time for the Run object
+            start_time = time.time()
+
+            # Run training
+            _, eval_returns, neg_returns, eval_timesteps, _ = train(env, config)
+
+            # Calculate training time
+            training_time = time.time() - start_time
+            times = [training_time] * len(eval_returns)  # Same time for all evals
+
+            # Update the Run object with this seed's results
+            run.update(
+                eval_returns=np.array(eval_returns),
+                eval_timesteps=np.array(eval_timesteps),
+                times=np.array(times)
+            )
+
+            env.close()
+
+    # Print results
+    print("\n===== RESULTS =====")
+    for gamma_key, run in runs.items():
+        print(f"Q-Learning (gamma={gamma_key}): {run.final_return_mean:.4f} ± {run.final_return_ste:.4f}")
+
+    # Determine which gamma performs better
+    if runs["0.99"].final_return_mean > runs["0.8"].final_return_mean:
+        print("\nBetter gamma for Q-Learning: 0.99")
+        answer2_1 = "a"
+    else:
+        print("\nBetter gamma for Q-Learning: 0.8")
+        answer2_1 = "b"
+
+    print(f"\nTo answer Question 2_1: The gamma value that leads to the best average evaluation return is {answer2_1}")
