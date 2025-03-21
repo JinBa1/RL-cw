@@ -8,7 +8,8 @@ from torch import Tensor
 from torch.distributions.categorical import Categorical
 import torch.nn
 from torch.optim import Adam
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, DefaultDict
+from collections import defaultdict
 
 import torch.nn.functional as F # Added imports
 
@@ -264,20 +265,21 @@ class DQN(Agent):
         """
         ### PUT YOUR CODE HERE ###
         states = batch.states
-        actions = batch.actions.long() # Need long type for indexing
-        rewards = batch.rewards
+        actions = batch.actions.long()  # Convert to long for indexing
+        rewards = batch.rewards.squeeze()  # Ensure it's (batch_size)
         next_states = batch.next_states
-        done = batch.done
+        done = batch.done.squeeze()  # Ensure it's (batch_size)
 
         # Get Q-values for current states and selected actions
-        current_q_values = self.critics_net(states).gather(1, actions).squeeze()
+        q_values = self.critics_net(states)
+        current_q_values = q_values.gather(1, actions).squeeze()  # Shape: (batch_size)
 
         # Compute the target Q-values
-        with torch.no_grad(): # Don't track gradients for target computation
+        with torch.no_grad():  # Don't track gradients for target computation
             # Get max Q-value for next state from target network
-            next_q_values = self.critics_target(next_states).max(1)[0]
+            next_q_values = self.critics_target(next_states).max(1)[0]  # Shape: (batch_size)
             # Bellman equation: Q(s,a) = r + gamma * max_a'(Q(s',a')) * (1 - done)
-            target_q_values = rewards + self.gamma * next_q_values * (1 - done)
+            target_q_values = rewards + self.gamma * next_q_values * (1 - done)  # Shape: (batch_size)
 
         # Compute the loss
         loss = F.mse_loss(current_q_values, target_q_values)
@@ -346,6 +348,7 @@ class DiscreteRL(Agent):
 
         # For mountain car environment discretization - creates k bins for each dimension, e.g. k=8
         # Position range: -1.2 to 0.6 (8 bins)
+        k = 8 # specify k
         self.position_bins = np.linspace(-1.2, 0.6, k)
         # Velocity range: -0.07 to 0.07 (8 bins)
         self.velocity_bins = np.linspace(-0.07, 0.07, k)
@@ -394,7 +397,7 @@ class DiscreteRL(Agent):
 
     def update(
             self, obs: np.ndarray, action: int, reward: float, n_obs: np.ndarray, done: bool
-    ) -> float:
+    ) -> Dict:
         """Updates the Q-table based on agent experience using Q-learning algorithm.
 
          ** YOU NEED TO IMPLEMENT THIS FUNCTION FOR Q3 BUT YOU CAN REUSE YOUR Q LEARNING CODE FROM Q2 (you can include it here or you adapt the files from Q2 to work of the mountain car problem **
@@ -416,6 +419,25 @@ class DiscreteRL(Agent):
 
         ### PUT YOUR CODE HERE ###
 
+        # Get current Q-value
+        old_q = self.q_table[(state, action)]
+
+        # Compute target Q-value
+        if done:
+            # For terminal states, the target is just the reward
+            target = reward
+        else:
+            # For non-terminal states, compute the target using Bellman equation
+            # Get maximum Q-value for next state across all actions
+            next_q_values = [self.q_table[(next_state, a)] for a in range(self.n_acts)]
+            max_next_q = max(next_q_values)
+            target = reward + self.gamma * max_next_q
+
+        # Update Q-value using learning rate (alpha)
+        new_q = old_q + self.alpha * (target - old_q)
+        self.q_table[(state, action)] = new_q
+
+        # Return the updated Q-value in a dictionary
         return {f"Q_value_{state}": self.q_table[(state, action)]}
 
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
