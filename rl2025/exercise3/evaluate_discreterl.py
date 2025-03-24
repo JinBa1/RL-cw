@@ -7,8 +7,8 @@ from rl2025.exercise3.agents import DiscreteRL
 from rl2025.exercise3.train_discreterl import play_episode, CARTPOLE_CONFIG, SWEEP_RESULTS_FILE_CARTPOLE, MOUNTAINCAR_CONFIG, SWEEP_RESULTS_FILE_MOUNTAINCAR
 from rl2025.util.result_processing import Run, get_best_saved_run
 
-ENV = "MOUNTAINCAR" # "CARTPOLE" OR "MOUNTAINCAR"
-RENDER = True
+ENV = "CARTPOLE" # "CARTPOLE" OR "MOUNTAINCAR"
+RENDER = False
 def evaluate(env: gym.Env, config, output: bool = True) -> Tuple[List[float], List[float]]:
     """
     Execute training of DISCRETERL on given environment using the provided configuration
@@ -59,11 +59,13 @@ if __name__ == "__main__":
     CONFIG.update(best_run.config)
 
     # Check if best_run_filename includes a path
-    if os.path.dirname(best_run_filename):
-        CONFIG['save_filename'] = best_run_filename
+    if not os.path.dirname(best_run_filename):
+        CONFIG['save_filename'] = f"weights/{best_run_filename}"
     else:
-        # Add the weights directory path if needed
-        CONFIG['save_filename'] = os.path.join("weights", best_run_filename)
+        CONFIG['save_filename'] = best_run_filename
+
+    # In evaluate_discreterl.py
+    print(f"Agent loaded from {CONFIG['save_filename']}")
     returns = evaluate(env, CONFIG)
     print(returns)
     env.close()

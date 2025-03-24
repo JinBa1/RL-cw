@@ -23,7 +23,7 @@ NUM_SEEDS_SWEEP = 10  # NUMBER OF SEEDS TO USE FOR EACH HYPERPARAMETER CONFIGURA
 SWEEP_SAVE_RESULTS = True  # TRUE TO SAVE SWEEP RESULTS TO A FILE
 SWEEP_SAVE_ALL_WEIGHTS = True  # TRUE TO SAVE ALL WEIGHTS FROM EACH SEED
 PLOT_RESULTS = True  # TRUE TO PLOT RESULTS FROM SWEEPS
-ENV = "MOUNTAINCAR"  # "CARTPOLE" is also possible
+ENV = "CARTPOLE"  # "CARTPOLE" is also possible
 
 # Hyperparameter configurations
 MOUNTAINCAR_CONFIG = {
@@ -211,6 +211,7 @@ def train(env: gym.Env, config: Dict, output: bool = True, seed: int = None) -> 
     if config.get("save_filename"):
         save_path = agent.save(config["save_filename"])
         print(f"\nSaved model to: {save_path}")
+        print(f"Model saved with final return: {eval_returns_all[-1]}")
 
     # Process run data
     run_data["train_episodes"] = np.arange(1, len(run_data["train_ep_returns"]) + 1).tolist()
@@ -336,9 +337,11 @@ if __name__ == "__main__":
                 # Set save filename if saving weights
                 run_save_filename = None
                 if SWEEP_SAVE_ALL_WEIGHTS:
-                    run_save_filename = f"weights/DiscreteRL_{ENV}_{hparams_values}_seed{i}.pt"
+                    run_save_filename = f"weights/DiscreteRL_{ENV}_{hparams_values}_seed{i}"
                     os.makedirs("weights", exist_ok=True)
                     run.set_save_filename(run_save_filename)
+
+                    print(f"Setting save filename to: {run_save_filename}")
 
                 # Train with current seed and config
                 seed = i  # Use iteration as seed
@@ -348,11 +351,14 @@ if __name__ == "__main__":
 
                 # Update Run object with results
                 run.update(eval_returns, eval_timesteps, times, run_data)
+                print(f"Seed {i} final return: {eval_returns[-1]}")
 
             # Store the run results
             results.append(copy.deepcopy(run))
             print(f"Finished run with {swept_param_values}. "
                   f"Mean final score: {run.final_return_mean:.4f} ± {run.final_return_ste:.4f}")
+            print(f"Run final returns: {run.final_returns}")
+            print(f"Run agent weights filenames: {run.agent_weights_filenames}")
 
         if SWEEP_SAVE_RESULTS:
             # Save sweep results to file
@@ -360,6 +366,12 @@ if __name__ == "__main__":
             os.makedirs("results", exist_ok=True)
             with open(f"results/{SWEEP_RESULTS_FILE}", 'wb') as f:
                 pickle.dump(results, f)
+
+        # Print best configuration details
+        best_run = sorted(results, key=lambda x: x.final_return_mean, reverse=True)[0]
+        print(f"\nBest configuration: {best_run.run_name}")
+        print(f"Best configuration mean return: {best_run.final_return_mean}")
+        print(f"Best configuration weights files: {best_run.agent_weights_filenames}")
 
         # Print summary of results
         answer = print_sweep_results(results)
