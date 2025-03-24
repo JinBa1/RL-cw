@@ -249,16 +249,16 @@ def plot_sweep_results(results, param_name, env_name):
     """Plot the results of a hyperparameter sweep"""
     plt.figure(figsize=(12, 6))
 
-    # Assuming we're plotting just the first parameter if multiple
-    param_name = param_names[0] if isinstance(param_names, list) else param_names
+    # Correctly handle parameter name whether it's a list or a string
+    param_key = param_name[0] if isinstance(param_name, list) else param_name
 
     # Get unique parameter values
-    param_values = sorted(list(set(run.config[param_name] for run in results)))
+    param_values = sorted(list(set(run.config[param_key] for run in results)))
     colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
 
     for i, param_value in enumerate(param_values):
         # Find all runs with this parameter value
-        matching_runs = [run for run in results if run.config[param_name] == param_value]
+        matching_runs = [run for run in results if run.config[param_key] == param_value]
 
         # Get evaluation data
         all_timesteps = matching_runs[0].all_eval_timesteps[0]  # Assuming all runs have same eval timesteps
@@ -273,7 +273,7 @@ def plot_sweep_results(results, param_name, env_name):
 
         # Plot with error bands
         plt.plot(all_timesteps, mean_returns, color=colors[i % len(colors)],
-                 label=f"{param_name}={param_value}")
+                 label=f"{param_key}={param_value}")
         plt.fill_between(all_timesteps,
                          np.array(mean_returns) - np.array(std_errs),
                          np.array(mean_returns) + np.array(std_errs),
@@ -281,13 +281,13 @@ def plot_sweep_results(results, param_name, env_name):
 
     plt.xlabel("Timesteps", fontsize=14)
     plt.ylabel("Mean Evaluation Return", fontsize=14)
-    plt.title(f"DiscreteRL Performance on {env_name} with Different {param_name}", fontsize=16)
+    plt.title(f"DiscreteRL Performance on {env_name} with Different {param_key}", fontsize=16)
     plt.legend(fontsize=12)
     plt.grid(True, alpha=0.3)
 
     # Save the figure
     os.makedirs("figures", exist_ok=True)
-    plt.savefig(f"figures/DiscreteRL_{env_name}_{param_name}_sweep.png", dpi=300, bbox_inches='tight')
+    plt.savefig(f"figures/DiscreteRL_{env_name}_{param_key}_sweep.png", dpi=300, bbox_inches='tight')
     plt.show()
 
 
@@ -295,8 +295,9 @@ def get_best_hyperparameter(results, param_name):
     """Get the best hyperparameter value based on final returns"""
     best_idx = np.argmax([run.final_return_mean for run in results])
     best_run = results[best_idx]
-    param_name = param_names[0] if isinstance(param_names, list) else param_names
-    return best_run.config[param_name], best_run.final_return_mean
+
+    param_key = param_name[0] if isinstance(param_name, list) else param_name
+    return best_run.config[param_key], best_run.final_return_mean
 
 
 if __name__ == "__main__":

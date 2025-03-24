@@ -48,12 +48,21 @@ if __name__ == "__main__":
         raise(ValueError(f"Unknown environment {ENV}"))
 
     env = gym.make(CONFIG["env"])
-    results = pickle.load(open(SWEEP_RESULTS_FILE, 'rb'))
+    try:
+        results = pickle.load(open(f"results/{SWEEP_RESULTS_FILE}", 'rb'))
+    except FileNotFoundError:
+        # Fallback to original path in case file was saved without directory
+        results = pickle.load(open(SWEEP_RESULTS_FILE, 'rb'))
     best_run, best_run_filename = get_best_saved_run(results)
     print(f"Best run was {best_run_filename}")
     CONFIG.update(best_run.config)
-    # replace the line below to point to the directory where your sweep results are stored
-    CONFIG['save_filename'] = best_run_filename
+
+    # Check if best_run_filename includes a path
+    if os.path.dirname(best_run_filename):
+        CONFIG['save_filename'] = best_run_filename
+    else:
+        # Add the weights directory path if needed
+        CONFIG['save_filename'] = os.path.join("weights", best_run_filename)
     returns = evaluate(env, CONFIG)
     print(returns)
     env.close()
