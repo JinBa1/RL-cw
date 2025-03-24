@@ -6,7 +6,7 @@ from rl2025.exercise3.agents import DiscreteRL
 from rl2025.exercise3.train_discreterl import play_episode, CARTPOLE_CONFIG, SWEEP_RESULTS_FILE_CARTPOLE, MOUNTAINCAR_CONFIG, SWEEP_RESULTS_FILE_MOUNTAINCAR
 from rl2025.util.result_processing import Run, get_best_saved_run
 
-ENV = "MOUNTAINCAR" # "CARTPOLE" OR "MOUNTAINCAR"
+ENV = "CARTPOLE" # "CARTPOLE" OR "MOUNTAINCAR"
 RENDER = True
 def evaluate(env: gym.Env, config, output: bool = True) -> Tuple[List[float], List[float]]:
     """

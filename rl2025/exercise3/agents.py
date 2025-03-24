@@ -313,9 +313,8 @@ class DiscreteRL(Agent):
     :attr q_table (DefaultDict): table storing Q-values for state-action pairs
     :attr position_bins (np.ndarray): bins for discretizing position dimension
     :attr velocity_bins (np.ndarray): bins for discretizing velocity dimension
-
-        ** YOU CAN CHANGE THE PROVIDED SETTINGS **
-
+    :attr angle_bins (np.ndarray): bins for discretizing angle dimension (for CartPole)
+    :attr angular_velocity_bins (np.ndarray): bins for discretizing angular velocity dimension (for CartPole)
     """
 
     def __init__(
@@ -343,15 +342,28 @@ class DiscreteRL(Agent):
         super().__init__(action_space=action_space, observation_space=observation_space)
 
         # Initialize Q-table as defaultdict with default value of 0 for any new state-action pair
-        # This avoids having to initialize all possible state-action pairs explicitly
         self.q_table: DefaultDict = defaultdict(lambda: 0)
 
-        # For mountain car environment discretization - creates k bins for each dimension, e.g. k=8
-        # Position range: -1.2 to 0.6 (8 bins)
-        k = 8 # specify k
-        self.position_bins = np.linspace(-1.2, 0.6, k)
-        # Velocity range: -0.07 to 0.07 (8 bins)
-        self.velocity_bins = np.linspace(-0.07, 0.07, k)
+        # Determine which environment we're working with based on observation space dimensions
+        self.state_dims = observation_space.shape[0]
+
+        # For both environments, create k bins for each dimension
+        k = 8  # Number of bins per dimension
+
+        if self.state_dims == 2:  # MountainCar
+            # Position range: -1.2 to 0.6
+            self.position_bins = np.linspace(-1.2, 0.6, k)
+            # Velocity range: -0.07 to 0.07
+            self.velocity_bins = np.linspace(-0.07, 0.07, k)
+        elif self.state_dims == 4:  # CartPole
+            # Cart position range: -2.4 to 2.4
+            self.position_bins = np.linspace(-2.4, 2.4, k)
+            # Cart velocity range: -4.0 to 4.0
+            self.velocity_bins = np.linspace(-4.0, 4.0, k)
+            # Pole angle range: -0.21 to 0.21 (in radians, approximately ±12°)
+            self.angle_bins = np.linspace(-0.21, 0.21, k)
+            # Pole angular velocity range: -4.0 to 4.0
+            self.angular_velocity_bins = np.linspace(-4.0, 4.0, k)
 
     def discretize_state(self, obs: np.ndarray) -> int:
         """Discretizes a continuous state observation into a unique integer identifier.
@@ -359,18 +371,38 @@ class DiscreteRL(Agent):
         Converts continuous observation values into discrete bins and creates
         a unique integer identifier for the discretized state.
 
-        :param obs (np.ndarray): continuous state observation (position, velocity)
+        :param obs (np.ndarray): continuous state observation
         :return (int): unique integer identifier for the discretized state
         """
-        # Convert continuous position to discrete bin index
-        position_idx = np.digitize(obs[0], self.position_bins) - 1
+        if self.state_dims == 2:  # MountainCar
+            # Convert continuous position to discrete bin index
+            position_idx = np.digitize(obs[0], self.position_bins) - 1
+            # Convert continuous velocity to discrete bin index
+            velocity_idx = np.digitize(obs[1], self.velocity_bins) - 1
 
-        # Convert continuous velocity to discrete bin index
-        velocity_idx = np.digitize(obs[1], self.velocity_bins) - 1
+            # Create a unique integer ID using position and velocity indices
+            unique_state_id = position_idx * len(self.velocity_bins) + velocity_idx
 
-        # Create a unique integer ID by combining position and velocity indices
-        # This creates a unique ID for each discretized state using a simple hash function
-        unique_state_id = position_idx * len(self.velocity_bins) + velocity_idx
+        elif self.state_dims == 4:  # CartPole
+            # Convert each dimension to discrete bin indices
+            position_idx = np.digitize(obs[0], self.position_bins) - 1
+            velocity_idx = np.digitize(obs[1], self.velocity_bins) - 1
+            angle_idx = np.digitize(obs[2], self.angle_bins) - 1
+            angular_velocity_idx = np.digitize(obs[3], self.angular_velocity_bins) - 1
+
+            # Create a unique integer ID by combining all indices
+            # Each index is multiplied by the product of the number of bins in the preceding dimensions
+            velocity_bins_len = len(self.velocity_bins)
+            angle_bins_len = len(self.angle_bins)
+            angular_velocity_bins_len = len(self.angular_velocity_bins)
+
+            unique_state_id = (position_idx * velocity_bins_len * angle_bins_len * angular_velocity_bins_len +
+                               velocity_idx * angle_bins_len * angular_velocity_bins_len +
+                               angle_idx * angular_velocity_bins_len +
+                               angular_velocity_idx)
+        else:
+            raise ValueError(f"Unsupported state dimension: {self.state_dims}")
+
         return unique_state_id
 
     def act(self, obs: np.ndarray, explore: bool = True) -> int:
@@ -400,8 +432,6 @@ class DiscreteRL(Agent):
     ) -> Dict:
         """Updates the Q-table based on agent experience using Q-learning algorithm.
 
-         ** YOU NEED TO IMPLEMENT THIS FUNCTION FOR Q3 BUT YOU CAN REUSE YOUR Q LEARNING CODE FROM Q2 (you can include it here or you adapt the files from Q2 to work of the mountain car problem **
-
         Implements the Q-learning update equation:
         Q(s,a) = Q(s,a) + alpha * (r + gamma * max_a' Q(s',a') - Q(s,a))
 
@@ -412,12 +442,9 @@ class DiscreteRL(Agent):
         :param done (bool): flag indicating whether episode is done
         :return (float): updated Q-value for current observation-action pair
         """
-
         # Convert continuous observations to discrete state identifiers
-        state = self.discretize_state(obs)  # Current state
-        next_state = self.discretize_state(n_obs)  # Next state
-
-        ### PUT YOUR CODE HERE ###
+        state = self.discretize_state(obs)
+        next_state = self.discretize_state(n_obs)
 
         # Get current Q-value
         old_q = self.q_table[(state, action)]
@@ -443,8 +470,6 @@ class DiscreteRL(Agent):
     def schedule_hyperparameters(self, timestep: int, max_timestep: int):
         """Updates the hyperparameters (specifically epsilon for exploration).
 
-        ** YOU CAN CHANGE THE PROVIDED SCHEDULING **
-
         Implements a linear decay schedule for epsilon, reducing from 1.0 to 0.01
         over the first 20% of total timesteps.
 
@@ -453,5 +478,4 @@ class DiscreteRL(Agent):
         """
         decay_progress = min(1.0, timestep / (0.20 * max_timestep))
         self.epsilon = 1.0 - decay_progress * 0.99  # Decays from 1.0 to 0.01
-
 
