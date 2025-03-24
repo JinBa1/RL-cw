@@ -2,6 +2,7 @@ import gymnasium as gym
 import pickle
 import os
 from typing import List, Tuple
+import numpy as np
 
 from rl2025.exercise3.agents import DiscreteRL 
 from rl2025.exercise3.train_discreterl import play_episode, CARTPOLE_CONFIG, SWEEP_RESULTS_FILE_CARTPOLE, MOUNTAINCAR_CONFIG, SWEEP_RESULTS_FILE_MOUNTAINCAR
@@ -9,15 +10,23 @@ from rl2025.util.result_processing import Run, get_best_saved_run
 
 ENV = "CARTPOLE" # "CARTPOLE" OR "MOUNTAINCAR"
 RENDER = False
-def evaluate(env: gym.Env, config, output: bool = True) -> Tuple[List[float], List[float]]:
+
+
+def evaluate(env: gym.Env, config, output: bool = True, eval_seed: int = None) -> Tuple[List[float], List[float]]:
     """
-    Execute training of DISCRETERL on given environment using the provided configuration
+    Execute evaluation of DISCRETERL on given environment using the provided configuration
 
     :param env (gym.Env): environment to train on
     :param config: configuration dictionary mapping configuration keys to values
     :param output (bool): flag whether evaluation results should be printed
-    :return (Tuple[List[float], List[float]]): eval returns during training, times of evaluation
+    :param eval_seed (int): seed for reproducibility during evaluation
+    :return (Tuple[List[float], List[float]]): eval returns during evaluation
     """
+    # Set seed if provided
+    if eval_seed is not None:
+        env.reset(seed=eval_seed)
+        np.random.seed(eval_seed)
+
     agent = DiscreteRL(
         action_space=env.action_space, observation_space=env.observation_space, **config
     )
@@ -63,10 +72,11 @@ if __name__ == "__main__":
         CONFIG['save_filename'] = f"weights/{best_run_filename}"
     else:
         CONFIG['save_filename'] = best_run_filename
-
+    seed_part = best_run_filename.split("seed")[1]
+    eval_seed = int(seed_part.split(".")[0])
     # In evaluate_discreterl.py
     print(f"Agent loaded from {CONFIG['save_filename']}")
-    returns = evaluate(env, CONFIG)
+    returns = evaluate(env, CONFIG, eval_seed=eval_seed)
     print(returns)
     env.close()
 

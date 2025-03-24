@@ -209,22 +209,45 @@ class DQN(Agent):
 
         def epsilon_linear_decay(*args, **kwargs):
             ### PUT YOUR CODE HERE ###
-            raise(NotImplementedError)
+            # Calculate the fraction of training completed
+            fraction = min(float(timestep) / (exploration_fraction * max_timestep), 1.0)
+
+            # Linear interpolation between epsilon_start and epsilon_min
+            return epsilon_start + fraction * (epsilon_min - epsilon_start)
 
         def epsilon_exponential_decay(*args, **kwargs):
             ### PUT YOUR CODE HERE ###
-            raise(NotImplementedError)
+            # Normalize timestep to [0, 1]
+            progress = timestep / max_timestep
+
+            # Calculate epsilon using exponential decay formula
+            epsilon = epsilon_start * (decay_rate ** progress)
+
+            # Ensure epsilon doesn't go below epsilon_min
+            return max(epsilon, epsilon_min)
 
         if self.epsilon_decay_strategy == "constant":
             pass
         elif self.epsilon_decay_strategy == "linear":
             # linear decay
             ### PUT YOUR CODE HERE ###
-            self.epsilon = epsilon_linear_decay(...)
+            self.epsilon = epsilon_linear_decay(
+                timestep,
+                max_timestep,
+                self.epsilon_start,
+                self.epsilon_min,
+                self.exploration_fraction
+            )
         elif self.epsilon_decay_strategy == "exponential":
             # exponential decay
             ### PUT YOUR CODE HERE ###
-            self.epsilon = epsilon_exponential_decay(...)
+            self.epsilon = epsilon_exponential_decay(
+                timestep,
+                max_timestep,
+                self.epsilon_start,
+                self.epsilon_min,
+                self.epsilon_exponential_decay_factor
+            )
         else:
             raise ValueError("epsilon_decay_strategy must be either 'constant', 'linear' or 'exponential'")
 
