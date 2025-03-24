@@ -219,18 +219,18 @@ def train(env: gym.Env, config: Dict, output: bool = True, seed: int = None) -> 
 
 
 def print_sweep_results(results):
-    """Print the results of a hyperparameter sweep"""
     print("\n===== HYPERPARAMETER SWEEP RESULTS =====")
     # Sort results by performance (best first)
     sorted_results = sorted(results, key=lambda x: x.final_return_mean, reverse=True)
 
     for run in sorted_results:
-        param_value = run.config["learning_rate"]
+        # Make sure this matches the parameter you're sweeping
+        param_value = run.config["alpha"]  # Changed from "learning_rate" to "alpha"
         print(f"Learning Rate {param_value}: {run.final_return_mean:.4f} ± {run.final_return_ste:.4f}")
 
     # Print the best hyperparameter
     best_run = sorted_results[0]
-    best_lr = best_run.config["learning_rate"]
+    best_lr = best_run.config["alpha"]  # Changed from "learning_rate" to "alpha"
     print(f"\nBest learning rate: {best_lr} with return: {best_run.final_return_mean:.4f}")
 
     # Determine the answer for question 3.1
@@ -248,6 +248,9 @@ def print_sweep_results(results):
 def plot_sweep_results(results, param_name, env_name):
     """Plot the results of a hyperparameter sweep"""
     plt.figure(figsize=(12, 6))
+
+    # Assuming we're plotting just the first parameter if multiple
+    param_name = param_names[0] if isinstance(param_names, list) else param_names
 
     # Get unique parameter values
     param_values = sorted(list(set(run.config[param_name] for run in results)))
@@ -292,6 +295,7 @@ def get_best_hyperparameter(results, param_name):
     """Get the best hyperparameter value based on final returns"""
     best_idx = np.argmax([run.final_return_mean for run in results])
     best_run = results[best_idx]
+    param_name = param_names[0] if isinstance(param_names, list) else param_names
     return best_run.config[param_name], best_run.final_return_mean
 
 
@@ -321,7 +325,8 @@ if __name__ == "__main__":
             run = Run(config)
             hparams_values = '_'.join([':'.join([key, str(config[key])]) for key in swept_params])
             run.run_name = hparams_values
-            print(f"\nStarting new run with {swept_params} = {config[swept_params]}")
+            swept_param_values = {param: config[param] for param in swept_params}
+            print(f"\nStarting new run with parameters: {swept_param_values}")
 
             # Run multiple seeds for statistical significance
             for i in range(NUM_SEEDS_SWEEP):
@@ -345,7 +350,7 @@ if __name__ == "__main__":
 
             # Store the run results
             results.append(copy.deepcopy(run))
-            print(f"Finished run with {swept_params} = {config[swept_params]}. "
+            print(f"Finished run with {swept_param_values}. "
                   f"Mean final score: {run.final_return_mean:.4f} ± {run.final_return_ste:.4f}")
 
         if SWEEP_SAVE_RESULTS:
@@ -359,8 +364,13 @@ if __name__ == "__main__":
         answer = print_sweep_results(results)
 
         if PLOT_RESULTS:
-            # Plot performance across hyperparameters
-            plot_sweep_results(results, swept_params, ENV_DISPLAY_NAME)
+            # Use
+            if len(swept_params) == 1:
+                plot_sweep_results(results, swept_params[0], ENV_DISPLAY_NAME)
+            else:
+                # Handle multiple parameters if needed
+                for param in swept_params:
+                    plot_sweep_results(results, param, ENV_DISPLAY_NAME)
 
     else:
         # Run a single training instance with default config
