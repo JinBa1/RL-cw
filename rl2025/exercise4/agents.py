@@ -146,7 +146,7 @@ class DDPG(Agent):
         if dir_path is None:
             dir_path = os.getcwd()
         save_path = os.path.join(dir_path, filename)
-        checkpoint = torch.load(save_path)
+        checkpoint = torch.load(save_path, weights_only=False)
         for k, v in self.saveables.items():
             v.load_state_dict(checkpoint[k].state_dict())
 
@@ -179,7 +179,18 @@ class DDPG(Agent):
         :return (sample from self.action_space): action the agent should perform
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q4")
+        obs_tensor = torch.FloatTensor(obs).unsqueeze(0)
+
+        with torch.no_grad():
+            action = self.actor(obs_tensor).squeeze(0).cpu().numpy()
+
+        if explore:
+            noise = self.noise.sample().numpy()
+            action = action + noise
+
+        action = np.clip(action, self.lower_action_bound, self.upper_action_bound)
+
+        return action
 
     def update(self, batch: Transition) -> Dict[str, float]:
         """Update function for DQN
@@ -194,7 +205,42 @@ class DDPG(Agent):
         :return (Dict[str, float]): dictionary mapping from loss names to loss values
         """
         ### PUT YOUR CODE HERE ###
-        raise NotImplementedError("Needed for Q4")
+        states = batch.states
+        actions = batch.actions
+        rewards = batch.rewards
+        next_states = batch.next_states
+        dones = batch.done
+
+        #update critic net
+        with torch.no_grad():
+            next_actions = self.actor_target(next_states)
+            next_q_values = self.critic_target(torch.cat([next_states, next_actions], dim=1))
+            target_q_values = rewards + (1 - dones) * self.gamma * next_q_values
+
+        current_q_values = self.critic(torch.cat([states, actions], dim=1))
+
+        critic_loss = F.mse_loss(current_q_values, target_q_values)
+
+        self.critic_optim.zero_grad()
+        critic_loss.backward()
+        self.critic_optim.step()
+
+        # update actor
+        actions_pred = self.actor(states)
+        actor_loss = -self.critic(torch.cat([states, actions_pred], dim=1)).mean()
+
+        self.actor.zero_grad()
+        actor_loss.backward()
+        self.policy_optim.step()
+
+        # update target networks
+        self.actor_target.soft_update(self.actor, self.tau)
+        self.critic_target.soft_update(self.critic, self.tau)
+
+        return {
+            "q_loss": critic_loss.item(),
+            "p_loss": actor_loss.item(),
+        }
 
         q_loss = 0.0
         p_loss = 0.0

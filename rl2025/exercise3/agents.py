@@ -207,30 +207,26 @@ class DQN(Agent):
         :param max_timestep (int): maximum timesteps that the training loop will run for
         """
 
-        def epsilon_linear_decay(*args, **kwargs):
-            ### PUT YOUR CODE HERE ###
+        def epsilon_linear_decay(ts, max_ts, eps_start, eps_min, explore_frac):
+            """Linear decay of epsilon from epsilon_start to epsilon_min"""
             # Calculate the fraction of training completed
-            fraction = min(float(timestep) / (exploration_fraction * max_timestep), 1.0)
-
+            fraction = min(float(ts) / (explore_frac * max_ts), 1.0)
             # Linear interpolation between epsilon_start and epsilon_min
-            return epsilon_start + fraction * (epsilon_min - epsilon_start)
+            return eps_start + fraction * (eps_min - eps_start)
 
-        def epsilon_exponential_decay(*args, **kwargs):
-            ### PUT YOUR CODE HERE ###
+        def epsilon_exponential_decay(ts, max_ts, eps_start, eps_min, decay_rate):
+            """Exponential decay of epsilon from epsilon_start to epsilon_min"""
             # Normalize timestep to [0, 1]
-            progress = timestep / max_timestep
-
+            progress = ts / max_ts
             # Calculate epsilon using exponential decay formula
-            epsilon = epsilon_start * (decay_rate ** progress)
-
+            epsilon = eps_start * (decay_rate ** progress)
             # Ensure epsilon doesn't go below epsilon_min
-            return max(epsilon, epsilon_min)
+            return max(epsilon, eps_min)
 
         if self.epsilon_decay_strategy == "constant":
             pass
         elif self.epsilon_decay_strategy == "linear":
-            # linear decay
-            ### PUT YOUR CODE HERE ###
+            # Pass all necessary parameters to the function
             self.epsilon = epsilon_linear_decay(
                 timestep,
                 max_timestep,
@@ -239,8 +235,7 @@ class DQN(Agent):
                 self.exploration_fraction
             )
         elif self.epsilon_decay_strategy == "exponential":
-            # exponential decay
-            ### PUT YOUR CODE HERE ###
+            # Pass all necessary parameters to the function
             self.epsilon = epsilon_exponential_decay(
                 timestep,
                 max_timestep,

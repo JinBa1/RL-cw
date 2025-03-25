@@ -17,7 +17,7 @@ from rl2025.util.hparam_sweeping import generate_hparam_configs
 from rl2025.util.result_processing import Run
 
 RENDER = False # FALSE FOR FASTER TRAINING / TRUE TO VISUALIZE ENVIRONMENT DURING EVALUATION
-SWEEP = True # TRUE TO SWEEP OVER POSSIBLE HYPERPARAMETER CONFIGURATIONS
+SWEEP = False # TRUE TO SWEEP OVER POSSIBLE HYPERPARAMETER CONFIGURATIONS
 NUM_SEEDS_SWEEP = 10 # NUMBER OF SEEDS TO USE FOR EACH HYPERPARAMETER CONFIGURATION
 SWEEP_SAVE_RESULTS = True # TRUE TO SAVE SWEEP RESULTS TO A FILE
 SWEEP_SAVE_ALL_WEIGHTS = True # TRUE TO SAVE ALL WEIGHTS FROM EACH SEED
@@ -32,13 +32,13 @@ MOUNTAINCAR_CONFIG = {
     "hidden_size": (64,64),
     "target_update_freq": 2000,
     "batch_size": 64,
-    "epsilon_decay_strategy": "linear", # "constant" or "linear" or "exponential"
+    "epsilon_decay_strategy": "constant", # "constant" or "linear" or "exponential"
     "epsilon_start": 0.5,
     "epsilon_min": 0.05, # only used in linear and exponential decay strategies
     "epsilon_decay": None, # For exponential epsilon decay
     "exploration_fraction": None, # For linear epsilon decay, fraction of training time at which epsilon=epsilon_min
     "buffer_capacity": int(1e6),
-    "plot_loss": False, # SET TRUE FOR 3.3 (Understanding the Loss)
+    "plot_loss": True, # SET TRUE FOR 3.3 (Understanding the Loss)
 }
 
 MOUNTAINCAR_CONFIG.update(MOUNTAINCAR_CONSTANTS)
@@ -209,6 +209,7 @@ def train(env: gym.Env, config, output: bool = True) -> Tuple[np.ndarray, np.nda
 
     if config["plot_loss"]:
         print("Plotting DQN loss...")
+        plt.figure(figsize=(12, 8))
         plt.plot(run_data["train_timesteps"], run_data["q_loss"], "-", alpha=0.7)
         plt.xlabel("Timesteps", fontsize=30)
         plt.ylabel("DQN Loss", fontsize=30)
@@ -216,7 +217,15 @@ def train(env: gym.Env, config, output: bool = True) -> Tuple[np.ndarray, np.nda
         plt.yticks(fontsize=25)
         plt.tight_layout(pad=0.3)
 
-        plt.show()
+        print(f"Min timestep: {min(run_data['train_timesteps'])}")
+        print(f"Max timestep: {max(run_data['train_timesteps'])}")
+
+        # Save the plot to a file instead of showing it
+        plt.savefig("dqn_loss_plot.png", dpi=300)
+        print("Loss plot saved to dqn_loss_plot.png")
+
+        # You can still keep the plt.show() if you want to display it as well
+        # plt.show()
 
     return np.array(eval_returns_all), np.array(eval_timesteps_all), np.array(eval_times_all), run_data
 
