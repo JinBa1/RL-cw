@@ -32,7 +32,7 @@ MOUNTAINCAR_CONFIG = {
     "hidden_size": (64,64),
     "target_update_freq": 2000,
     "batch_size": 64,
-    "epsilon_decay_strategy": "constant", # "constant" or "linear" or "exponential"
+    "epsilon_decay_strategy": "linear", # "constant" or "linear" or "exponential"
     "epsilon_start": 0.5,
     "epsilon_min": 0.05, # only used in linear and exponential decay strategies
     "epsilon_decay": None, # For exponential epsilon decay
