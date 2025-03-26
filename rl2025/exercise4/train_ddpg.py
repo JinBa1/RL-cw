@@ -10,6 +10,7 @@ import time
 from tqdm import tqdm
 from typing import List, Tuple, Dict
 import matplotlib.pyplot as plt
+import torch
 
 from rl2025.constants import EX4_RACETRACK_CONSTANTS as RACETRACK_CONSTANTS
 from rl2025.exercise4.agents import DDPG
@@ -19,7 +20,7 @@ from rl2025.util.result_processing import Run
 
 RENDER = False # FALSE FOR FASTER TRAINING / TRUE TO VISUALIZE ENVIRONMENT DURING EVALUATION
 SWEEP = True # TRUE TO SWEEP OVER POSSIBLE HYPERPARAMETER CONFIGURATIONS
-NUM_SEEDS_SWEEP = 10 # NUMBER OF SEEDS TO USE FOR EACH HYPERPARAMETER CONFIGURATION
+NUM_SEEDS_SWEEP = 3 # NUMBER OF SEEDS TO USE FOR EACH HYPERPARAMETER CONFIGURATION
 SWEEP_SAVE_RESULTS = True # TRUE TO SAVE SWEEP RESULTS TO A FILE
 SWEEP_SAVE_ALL_WEIGTHS = True # TRUE TO SAVE ALL WEIGHTS FROM EACH SEED
 ENV = "RACETRACK"
@@ -183,8 +184,8 @@ def train(env: gym.Env, env_eval: gym.Env, config: Dict, output: bool = True) ->
 if __name__ == "__main__":
     if ENV == "RACETRACK":
         CONFIG = RACETRACK_CONFIG
-        HPARAMS_SWEEP = None # Not required for assignment
-        SWEEP_RESULTS_FILE = None # Not required for assignment
+        HPARAMS_SWEEP = RACETRACK_HPARAMS # Not required for assignment
+        SWEEP_RESULTS_FILE = SWEEP_RESULTS_FILE_RACETRACK # Not required for assignment
     else:
         raise(ValueError(f"Unknown environment {ENV}"))
 
@@ -192,20 +193,26 @@ if __name__ == "__main__":
     env_eval = gym.make(CONFIG["env"])
 
     if SWEEP and HPARAMS_SWEEP is not None:
-        qqq
         config_list, swept_params = generate_hparam_configs(CONFIG, HPARAMS_SWEEP)
         results = []
         for config in config_list:
             run = Run(config)
             hparams_values = '_'.join([':'.join([key, str(config[key])]) for key in swept_params])
             run.run_name = hparams_values
-            print(f"\nStarting new run...")
+            # Add these print statements
+            print(f"\n==== Starting new run with configuration ====")
+            print(f"Critic hidden size: {config['critic_hidden_size']}")
+            print(f"Policy hidden size: {config['policy_hidden_size']}")
+            print(f"====================================\n")
             for i in range(NUM_SEEDS_SWEEP):
+                np.random.seed(i)
+                torch.manual_seed(i)
+                env.reset(seed=i)
                 print(f"\nTraining iteration: {i+1}/{NUM_SEEDS_SWEEP}")
                 run_save_filename = '--'.join([run.config["algo"], run.config["env"], hparams_values, str(i)])
                 if SWEEP_SAVE_ALL_WEIGTHS:
                     run.set_save_filename(run_save_filename)
-                eval_returns, eval_timesteps, times, run_data = train(env, run.config, output=False)
+                eval_returns, eval_timesteps, times, run_data = train(env, env_eval, run.config, output=False)
                 run.update(eval_returns, eval_timesteps, times, run_data)
             results.append(copy.deepcopy(run))
             print(f"Finished run with hyperparameters {hparams_values}. "
