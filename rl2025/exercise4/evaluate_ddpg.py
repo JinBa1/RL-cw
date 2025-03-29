@@ -10,7 +10,13 @@ from rl2025.exercise4.train_ddpg import RACETRACK_CONFIG, play_episode
 
 RENDER = False
 
-CONFIG = RACETRACK_CONFIG
+# CONFIG = RACETRACK_CONFIG
+
+CONFIG = RACETRACK_CONFIG.copy()
+# Update hidden sizes to match the ones used for the model you're evaluating
+CONFIG["critic_hidden_size"] = [64, 128, 64]  # Match the saved model's architecture
+CONFIG["policy_hidden_size"] = [64, 64, 64, 64]  # Match the saved model's architecture
+CONFIG["save_filename"] = "DDPG--racetrack-v0--critic_hidden_size:[64, 128, 64]_policy_hidden_size:[64, 64, 64, 64]--2.pt"
 
 
 def evaluate(env: gym.Env, config: Dict, output: bool = True) -> Tuple[List[float], List[float]]:

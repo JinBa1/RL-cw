@@ -57,6 +57,7 @@ EX4_RACETRACK_CONSTANTS = {
     "max_time": 120 * 60,
     "gamma": 0.95,
     "save_filename": "racetrack_latest.pt",
+    # "save_filename": "DDPG--racetrack-v0--critic_hidden_size:[64, 128, 64]_policy_hidden_size:[64, 64, 64, 64]--2.pt",
     "eval_freq": 100,
     "eval_episodes": 5,
     "policy_learning_rate": 1e-3,
